@@ -2,7 +2,19 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
-const ROOT = path.resolve(process.cwd(), process.env.UPLOAD_ROOT ?? "./uploads");
+function resolveRoot(): string {
+  if (process.env.UPLOAD_ROOT) {
+    return path.resolve(process.cwd(), process.env.UPLOAD_ROOT);
+  }
+  // Vercel serverless functions have a read-only filesystem except /tmp.
+  // Files in /tmp are ephemeral (wiped on cold start) — OK for trial only.
+  if (process.env.VERCEL) {
+    return "/tmp/uploads";
+  }
+  return path.resolve(process.cwd(), "./uploads");
+}
+
+const ROOT = resolveRoot();
 
 export async function saveFile(
   subdir: string,

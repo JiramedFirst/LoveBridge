@@ -28,7 +28,11 @@ Built as a **full-stack PWA** with Next.js 15, Prisma, PostgreSQL, Auth.js, next
 | PWA       | next-pwa (service worker, manifest) |
 | Messaging | LINE Messaging API (webhook + reply/push) |
 
-## Getting started
+## Deploy (try it online)
+
+ดู [DEPLOY.md](./DEPLOY.md) — คู่มือ deploy บน **Vercel + Neon** ใช้เวลา ~10 นาที, ฟรี.
+
+## Getting started (local)
 
 ### 1. Boot Postgres
 
