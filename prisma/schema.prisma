@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum VisaType {
+  SPOUSE_US
+  SPOUSE_UK
+  SPOUSE_AU
+  SPOUSE_DE
+  FIANCE_US
+  OTHER
+}
+
+enum CaseStatus {
+  LEAD
+  DOCUMENT_COLLECTION
+  SUBMITTED
+  INTERVIEW
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum ActivityType {
+  NOTE
+  STATUS_CHANGE
+  DOC_UPLOADED
+  PAYMENT
+  LINE_MESSAGE
+}
+
+enum DocumentType {
+  PASSPORT
+  ID_CARD
+  HOUSE_REG
+  MARRIAGE_CERT
+  BIRTH_CERT
+  FINANCIAL_PROOF
+  RELATIONSHIP_PROOF
+  PHOTO
+  EMBASSY_FORM
+  OTHER
+}
+
+enum OwnerSide {
+  CLIENT
+  PARTNER
+  JOINT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum LineMessageType {
+  TEXT
+  IMAGE
+  FILE
+  STICKER
+  LOCATION
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  passwordHash   String
+  name           String
+  role           Role           @default(STAFF)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  clients        Client[]       @relation("AssignedClients")
+  cases          VisaCase[]     @relation("AssignedCases")
+  activities     CaseActivity[]
+  uploads        Document[]
+  payments       Payment[]
+  sentMessages   LineMessage[]
+}
+
+model Client {
+  id           String     @id @default(cuid())
+  firstName    String
+  lastName     String
+  nationalId   String?
+  phone        String?
+  email        String?
+  address      String?
+  dateOfBirth  DateTime?
+  notes        String?
+  assignedToId String?
+  assignedTo   User?      @relation("AssignedClients", fields: [assignedToId], references: [id], onDelete: SetNull)
+  partner      Partner?
+  cases        VisaCase[]
+  lineContacts LineContact[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([assignedToId])
+  @@index([lastName, firstName])
+}
+
+model Partner {
+  id                 String   @id @default(cuid())
+  clientId           String   @unique
+  client             Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  firstName          String
+  lastName           String
+  passportNo         String?
+  nationality        String?
+  dateOfBirth        DateTime?
+  occupation         String?
+  countryOfResidence String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model VisaCase {
+  id                 String         @id @default(cuid())
+  caseNumber         String         @unique
+  clientId           String
+  client             Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  visaType           VisaType
+  destinationCountry String
+  status             CaseStatus     @default(LEAD)
+  targetSubmitDate   DateTime?
+  openedAt           DateTime       @default(now())
+  closedAt           DateTime?
+  assignedToId       String?
+  assignedTo         User?          @relation("AssignedCases", fields: [assignedToId], references: [id], onDelete: SetNull)
+  activities         CaseActivity[]
+  documents          Document[]
+  invoices           Invoice[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([clientId])
+}
+
+model CaseActivity {
+  id        String       @id @default(cuid())
+  caseId    String
+  case      VisaCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      ActivityType
+  message   String
+  createdAt DateTime     @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  caseId       String
+  case         VisaCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type         DocumentType
+  ownerSide    OwnerSide
+  fileName     String
+  filePath     String
+  mimeType     String
+  fileSize     Int
+  verified     Boolean      @default(false)
+  uploadedById String?
+  uploadedBy   User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt   DateTime     @default(now())
+
+  @@index([caseId])
+}
+
+model Invoice {
+  id            String         @id @default(cuid())
+  invoiceNumber String         @unique
+  caseId        String
+  case          VisaCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  issueDate     DateTime       @default(now())
+  dueDate       DateTime
+  status        InvoiceStatus  @default(DRAFT)
+  subtotal      Decimal        @db.Decimal(12, 2)
+  tax           Decimal        @db.Decimal(12, 2) @default(0)
+  total         Decimal        @db.Decimal(12, 2)
+  notes         String?
+  items         InvoiceItem[]
+  payments      Payment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([caseId])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal @db.Decimal(10, 2) @default(1)
+  unitPrice   Decimal @db.Decimal(12, 2)
+  amount      Decimal @db.Decimal(12, 2)
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Decimal       @db.Decimal(12, 2)
+  method       PaymentMethod
+  paidAt       DateTime      @default(now())
+  reference    String?
+  recordedById String?
+  recordedBy   User?         @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+
+  @@index([invoiceId])
+}
+
+model LineContact {
+  id            String        @id @default(cuid())
+  lineUserId    String        @unique
+  displayName   String
+  pictureUrl    String?
+  clientId      String?
+  client        Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  firstSeenAt   DateTime      @default(now())
+  lastMessageAt DateTime      @default(now())
+  unreadCount   Int           @default(0)
+  messages      LineMessage[]
+
+  @@index([clientId])
+  @@index([lastMessageAt])
+}
+
+model LineMessage {
+  id            String           @id @default(cuid())
+  lineContactId String
+  contact       LineContact      @relation(fields: [lineContactId], references: [id], onDelete: Cascade)
+  direction     MessageDirection
+  messageType   LineMessageType
+  text          String?
+  mediaPath     String?
+  lineMessageId String?
+  sentById      String?
+  sentBy        User?            @relation(fields: [sentById], references: [id], onDelete: SetNull)
+  createdAt     DateTime         @default(now())
+  readAt        DateTime?
+
+  @@index([lineContactId, createdAt])
+}
