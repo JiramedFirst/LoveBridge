@@ -1,0 +1,19 @@
+{
+  "name": "LoveBridge",
+  "short_name": "LoveBridge",
+  "description": "Marriage Visa Management System",
+  "start_url": "/th",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#e11d74",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

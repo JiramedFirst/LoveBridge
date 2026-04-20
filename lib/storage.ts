@@ -1,0 +1,54 @@
+import { promises as fs } from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+
+function resolveRoot(): string {
+  if (process.env.UPLOAD_ROOT) {
+    return path.resolve(process.cwd(), process.env.UPLOAD_ROOT);
+  }
+  // Vercel serverless functions have a read-only filesystem except /tmp.
+  // Files in /tmp are ephemeral (wiped on cold start) — OK for trial only.
+  if (process.env.VERCEL) {
+    return "/tmp/uploads";
+  }
+  return path.resolve(process.cwd(), "./uploads");
+}
+
+const ROOT = resolveRoot();
+
+export async function saveFile(
+  subdir: string,
+  fileName: string,
+  data: Buffer | Uint8Array,
+): Promise<{ relativePath: string; absolutePath: string }> {
+  const safeName = sanitize(fileName);
+  const dir = path.join(ROOT, subdir);
+  await fs.mkdir(dir, { recursive: true });
+  const unique = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
+  const absolutePath = path.join(dir, unique);
+  await fs.writeFile(absolutePath, data);
+  const relativePath = path.posix.join(subdir, unique);
+  return { relativePath, absolutePath };
+}
+
+export async function readFile(relativePath: string): Promise<Buffer> {
+  const abs = resolveSafe(relativePath);
+  return fs.readFile(abs);
+}
+
+export async function deleteFile(relativePath: string): Promise<void> {
+  const abs = resolveSafe(relativePath);
+  await fs.unlink(abs).catch(() => undefined);
+}
+
+export function resolveSafe(relativePath: string): string {
+  const abs = path.resolve(ROOT, relativePath);
+  if (!abs.startsWith(ROOT)) {
+    throw new Error("Path traversal detected");
+  }
+  return abs;
+}
+
+function sanitize(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+}

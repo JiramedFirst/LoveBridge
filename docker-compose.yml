@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lovebridge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lovebridge
+      POSTGRES_PASSWORD: lovebridge
+      POSTGRES_DB: lovebridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - lovebridge_pg:/var/lib/postgresql/data
+
+volumes:
+  lovebridge_pg:
